@@ -14,14 +14,9 @@ BUILT_SOURCES = \
 
 libdatetime_plugin_la_SOURCES = \
 	$(BUILT_SOURCES) \
-	clock-time.h \
-	clock-time.c \
-	clock-digital.h \
-	clock-digital.c \
 	datetime-plugin.h \
 	datetime-plugin.c \
 	$(NULL)
-
 
 resource_files = $(shell glib-compile-resources --sourcedir=$(srcdir) --generate-dependencies $(srcdir)/gresource.xml)
 datetime-window-resources.c: gresource.xml $(resource_files)

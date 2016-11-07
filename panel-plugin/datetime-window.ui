@@ -8,7 +8,7 @@
     <property name="border_width">6</property>
     <property name="resizable">False</property>
     <child>
-      <object class="GtkCalendar" id="calendar1">
+      <object class="GtkCalendar" id="calendar">
         <property name="visible">True</property>
         <property name="can_focus">True</property>
         <property name="year">2016</property>

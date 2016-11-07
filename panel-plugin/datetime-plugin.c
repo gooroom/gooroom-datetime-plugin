@@ -27,8 +27,8 @@
 #include <math.h>
 #endif
 
-#include "clock-time.h"
-#include "clock-digital.h"
+//#include "clock-time.h"
+//#include "clock-digital.h"
 #include "datetime-plugin.h"
 #include "datetime-window-resources.h"
 
@@ -39,6 +39,7 @@
 #include <libxfce4panel/xfce-panel-plugin.h>
 
 
+#define DEFAULT_DIGITAL_FORMAT "%I: %M %P"
 
 #define GET_WIDGET(builder, x) GTK_WIDGET (gtk_builder_get_object (builder, x))
 
@@ -54,10 +55,10 @@ struct _DateTimePlugin
 
 	GtkWidget       *button;
 	GtkWidget       *popup_window;
-	GtkWidget       *clock;
+	GtkWidget       *clock_label;
 	GtkWidget       *calendar;
 
-	ClockTime       *time;
+	guint            timeout_id;
 
 	GtkBuilder      *builder;
 };
@@ -96,19 +97,19 @@ static void
 on_popup_window_realized (GtkWidget *widget, gpointer data)
 {
 	gint x, y;
-	GDateTime *time;
+	GDateTime *datetime;
 
 	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
 
-	time = clock_time_get_time (plugin->time);
+	datetime = g_date_time_new_now_local ();
 
 	gtk_calendar_select_month (GTK_CALENDAR (plugin->calendar),
-								g_date_time_get_month (time) - 1,
-								g_date_time_get_year (time));
+								g_date_time_get_month (datetime) - 1,
+								g_date_time_get_year (datetime));
 
-	gtk_calendar_select_day (GTK_CALENDAR (plugin->calendar), g_date_time_get_day_of_month (time));
+	gtk_calendar_select_day (GTK_CALENDAR (plugin->calendar), g_date_time_get_day_of_month (datetime));
 
-	g_date_time_unref (time);
+	g_date_time_unref (datetime);
 
 	xfce_panel_plugin_position_widget (XFCE_PANEL_PLUGIN (plugin), widget, plugin->button, &x, &y);
 	gtk_window_move (GTK_WINDOW (widget), x, y);
@@ -128,7 +129,6 @@ on_popup_window_open (DateTimePlugin *plugin)
 	}
 
 	window = GET_WIDGET (plugin->builder, "datetime-window");
-//	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_window_set_type_hint (GTK_WINDOW (window), GDK_WINDOW_TYPE_HINT_UTILITY);
 	gtk_window_set_decorated (GTK_WINDOW (window), FALSE);
 	gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
@@ -140,16 +140,7 @@ on_popup_window_open (DateTimePlugin *plugin)
 	screen = gtk_widget_get_screen (GTK_WIDGET (plugin->button));
 	gtk_window_set_screen (GTK_WINDOW (window), screen);
 
-#if 0
-	plugin->calendar = gtk_calendar_new ();
-	gtk_calendar_set_display_options (GTK_CALENDAR (plugin->calendar),
-			GTK_CALENDAR_SHOW_HEADING
-			| GTK_CALENDAR_SHOW_DAY_NAMES
-			| GTK_CALENDAR_SHOW_WEEK_NUMBERS);
-
-	gtk_container_add (GTK_CONTAINER (plugin->popup_window), plugin->calendar);
-	gtk_widget_show (plugin->calendar);
-#endif
+	plugin->calendar = GET_WIDGET (plugin->builder, "calendar");
 
 	g_signal_connect (G_OBJECT (window), "realize", G_CALLBACK (on_popup_window_realized), plugin);
 	g_signal_connect_swapped (G_OBJECT (window), "delete-event", G_CALLBACK (on_popup_window_closed), plugin);
@@ -199,90 +190,94 @@ datetime_plugin_reposition_calendar (DateTimePlugin *plugin)
 static gboolean
 datetime_plugin_size_changed (XfcePanelPlugin *panel_plugin, gint size)
 {
-  DateTimePlugin *plugin = DATETIME_PLUGIN (panel_plugin);
-  gdouble      ratio;
-  gint         ratio_size;
-  gint         offset;
+	DateTimePlugin *plugin = DATETIME_PLUGIN (panel_plugin);
 
-  if (plugin->clock == NULL)
-    return TRUE;
+	if (xfce_panel_plugin_get_mode (panel_plugin) == XFCE_PANEL_PLUGIN_MODE_HORIZONTAL) {
+		gtk_widget_set_size_request (GTK_WIDGET (panel_plugin), -1, size);
+	} else {
+		gtk_widget_set_size_request (GTK_WIDGET (panel_plugin), size, -1);
+	}
 
-  /* get the width:height ratio */
-  g_object_get (G_OBJECT (plugin->clock), "size-ratio", &ratio, NULL);
-  if (ratio > 0)
-    {
-      ratio_size = size;
-      offset = 0;
-    }
-  else
-    {
-      ratio_size = -1;
-      offset = 0;
-    }
+	if (plugin->popup_window != NULL && gtk_widget_get_visible (GTK_WIDGET (plugin->popup_window)))
+		datetime_plugin_reposition_calendar (plugin);
 
-  /* set the clock size */
-  if (xfce_panel_plugin_get_mode (panel_plugin) == XFCE_PANEL_PLUGIN_MODE_HORIZONTAL)
-    {
-      if (ratio > 0)
-        {
-          ratio_size = ceil (ratio_size * ratio);
-          ratio_size += offset;
-        }
-
-//      gtk_widget_set_size_request (GTK_WIDGET (panel_plugin), ratio_size, size);
-      gtk_widget_set_size_request (GTK_WIDGET (panel_plugin), -1, size);
-    }
-  else
-    {
-      if (ratio > 0)
-        {
-          ratio_size = ceil (ratio_size / ratio);
-          ratio_size += offset;
-        }
-
-//      gtk_widget_set_size_request (GTK_WIDGET (panel_plugin), size, ratio_size);
-      gtk_widget_set_size_request (GTK_WIDGET (panel_plugin), size, -1);
-    }
-
-  if (plugin->popup_window != NULL
-      && gtk_widget_get_visible (GTK_WIDGET (plugin->popup_window)))
-    datetime_plugin_reposition_calendar (plugin);
-
-  return TRUE;
+	return TRUE;
 }
 
 static void
-datetime_plugin_size_ratio_changed (XfcePanelPlugin *panel_plugin)
+datetime_plugin_mode_changed (XfcePanelPlugin *plugin, XfcePanelPluginMode mode)
 {
-	datetime_plugin_size_changed (panel_plugin, xfce_panel_plugin_get_size (panel_plugin));
+	datetime_plugin_size_changed (plugin, xfce_panel_plugin_get_size (plugin));
+}
+
+
+static gboolean
+clock_label_update (gpointer data)
+{
+	gchar *str;
+	GDateTime *datetime;
+
+	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
+
+	datetime = g_date_time_new_now_local ();
+	str = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
+	gtk_label_set_markup (GTK_LABEL (plugin->clock_label), str);
+	g_free (str);
+
+	g_date_time_unref (datetime);
+
+	return TRUE;
+}
+
+static gboolean
+datetime_plugin_clock_timeout_sync (gpointer data)
+{
+	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
+
+	if (G_LIKELY (plugin->timeout_id != 0))
+		g_source_remove (plugin->timeout_id);
+
+	plugin->timeout_id = 0;
+
+	clock_label_update (plugin);
+
+	/* start the real timeout default = 1M(60s) */
+	plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 60,
+											clock_label_update, plugin, NULL);
+
+	return FALSE;
 }
 
 static void
 datetime_plugin_add_clock (DateTimePlugin *plugin)
 {
-	GtkOrientation      orientation;
+	gchar *str;
+	GDateTime *datetime;
+	guint      next_interval;
 
-	if (plugin->clock != NULL)
-		gtk_widget_destroy (plugin->clock);
+	plugin->clock_label = gtk_label_new (NULL);
+	gtk_label_set_justify (GTK_LABEL (plugin->clock_label), GTK_JUSTIFY_CENTER);
+	gtk_container_add (GTK_CONTAINER (plugin->button), plugin->clock_label);
+	gtk_widget_show (plugin->clock_label);
 
-	/* create a new clock */
-	plugin->clock = xfce_clock_digital_new (plugin->time);
+	datetime = g_date_time_new_now_local ();
+	str = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
+	gtk_label_set_markup (GTK_LABEL (plugin->clock_label), str);
+	g_free (str);
 
-	orientation = (xfce_panel_plugin_get_mode (XFCE_PANEL_PLUGIN (plugin)) == XFCE_PANEL_PLUGIN_MODE_VERTICAL) ?
-					GTK_ORIENTATION_VERTICAL : GTK_ORIENTATION_HORIZONTAL;
+	next_interval = 60 - g_date_time_get_second (datetime);
 
-	g_object_set (G_OBJECT (plugin->clock), "orientation", orientation, NULL);
+	if (next_interval > 0) {
+		plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, next_interval,
+													datetime_plugin_clock_timeout_sync,
+													plugin, NULL);
+	} else {
+		/* directly start running the normal timeout */
+		plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 60,
+												clock_label_update, plugin, NULL);
+	}
 
-	/* watch width/height changes */
-	g_signal_connect_swapped (G_OBJECT (plugin->clock), "notify::size-ratio",
-							G_CALLBACK (datetime_plugin_size_ratio_changed), plugin);
-
-	datetime_plugin_size_changed (XFCE_PANEL_PLUGIN (plugin),
-			xfce_panel_plugin_get_size (XFCE_PANEL_PLUGIN (plugin)));
-
-	gtk_container_add (GTK_CONTAINER (plugin->button), plugin->clock);
-
-	gtk_widget_show (plugin->clock);
+	g_date_time_unref (datetime);
 }
 
 static void
@@ -293,8 +288,8 @@ datetime_plugin_free_data (XfcePanelPlugin *panel_plugin)
 	if (plugin->popup_window)
 		gtk_widget_destroy (plugin->popup_window);
 
-	if (plugin->time)
-		g_object_unref (G_OBJECT (plugin->time));
+	if (G_LIKELY (plugin->timeout_id != 0))
+		g_source_remove (plugin->timeout_id);
 
 	if (plugin->builder)
 		g_object_unref (G_OBJECT (plugin->builder));
@@ -305,47 +300,47 @@ datetime_plugin_init (DateTimePlugin *plugin)
 {
 	GError *error        = NULL;
 
-	plugin->clock        = NULL;
 	plugin->button       = NULL;
+	plugin->clock_label  = NULL;
 
 	g_resources_register (datetime_window_get_resource ());
 
 	plugin->builder = gtk_builder_new ();
-
-	plugin->time = clock_time_new ();
 }
 
 static void
 datetime_plugin_construct (XfcePanelPlugin *panel_plugin)
 {
 	GtkWidget *image;
-	GtkCssProvider *css_provider;
 
 	DateTimePlugin *plugin = DATETIME_PLUGIN (panel_plugin);
 
 	xfce_textdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR, "UTF-8");
 
 	plugin->button = xfce_panel_create_toggle_button ();
-	gtk_widget_set_name (plugin->button, "clock-button");
+	gtk_widget_set_name (plugin->button, "datetime-plugin-button");
 	gtk_button_set_relief (GTK_BUTTON (plugin->button), GTK_RELIEF_NONE);
 	gtk_container_add (GTK_CONTAINER (plugin), plugin->button);
 	xfce_panel_plugin_add_action_widget (XFCE_PANEL_PLUGIN (plugin), plugin->button);
 	gtk_widget_show (plugin->button);
 
+#if 0
+	GtkCssProvider *css_provider;
+
     /* Sane default Gtk style */
 	css_provider = gtk_css_provider_new ();
 	gtk_css_provider_load_from_data (css_provider,
-                                     "#clock-button {"
+                                     "#datetime-plugin-button {"
                                      "-GtkWidget-focus-padding: 0;"
                                      "-GtkWidget-focus-line-width: 0;"
                                      "-GtkButton-default-border: 0;"
                                      "-GtkButton-inner-border: 0;"
-                                     "padding: 6px;"
+                                     "padding: 0 3px;"
                                      "border-width: 1px;}",
                                      -1, NULL);
 	gtk_style_context_add_provider (GTK_STYLE_CONTEXT (gtk_widget_get_style_context (GTK_WIDGET (plugin->button))),
 			GTK_STYLE_PROVIDER (css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-
+#endif
 
 	g_signal_connect (G_OBJECT (plugin->button), "button-press-event", G_CALLBACK (on_plugin_button_pressed), plugin);
 
@@ -361,4 +356,5 @@ datetime_plugin_class_init (DateTimePluginClass *klass)
 	plugin_class->construct = datetime_plugin_construct;
 	plugin_class->free_data = datetime_plugin_free_data;
 	plugin_class->size_changed = datetime_plugin_size_changed;
+	plugin_class->mode_changed = datetime_plugin_mode_changed;
 }
