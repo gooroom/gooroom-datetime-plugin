@@ -1,2 +1,3 @@
-panel-plugin/datetime-plugin.desktop.in.in
 panel-plugin/datetime-plugin.c
+panel-plugin/datetime-plugin.desktop.in.in
+[type: gettext/glade]panel-plugin/datetime-window.ui

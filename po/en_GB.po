@@ -22,3 +22,7 @@ msgstr "Gooroom DateTime Plugin"
 #: ../panel-plugin/datetime-plugin.desktop.in.in.h:2
 msgid "Date and Time plugin with a simple calendar"
 msgstr "Date and Time plugin with a simple calendar"
+
+#: ../panel-plugin/datetime-window.ui.h:1
+msgid "Date & Time"
+msgstr "Date & Time"

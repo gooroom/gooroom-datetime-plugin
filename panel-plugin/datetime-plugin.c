@@ -27,8 +27,6 @@
 #include <math.h>
 #endif
 
-//#include "clock-time.h"
-//#include "clock-digital.h"
 #include "datetime-plugin.h"
 #include "datetime-window-resources.h"
 
@@ -214,14 +212,16 @@ datetime_plugin_mode_changed (XfcePanelPlugin *plugin, XfcePanelPluginMode mode)
 static gboolean
 clock_label_update (gpointer data)
 {
-	gchar *str;
+	gchar *str, *format;
 	GDateTime *datetime;
 
 	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
 
 	datetime = g_date_time_new_now_local ();
-	str = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
+	format = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
+	str = g_strdup_printf ("<b>%s</b>", format);
 	gtk_label_set_markup (GTK_LABEL (plugin->clock_label), str);
+	g_free (format);
 	g_free (str);
 
 	g_date_time_unref (datetime);
@@ -251,7 +251,7 @@ datetime_plugin_clock_timeout_sync (gpointer data)
 static void
 datetime_plugin_add_clock (DateTimePlugin *plugin)
 {
-	gchar *str;
+	gchar *str, *format;
 	GDateTime *datetime;
 	guint      next_interval;
 
@@ -261,8 +261,11 @@ datetime_plugin_add_clock (DateTimePlugin *plugin)
 	gtk_widget_show (plugin->clock_label);
 
 	datetime = g_date_time_new_now_local ();
-	str = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
+	format = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
+	str = g_strdup_printf ("<b>%s</b>", format);
 	gtk_label_set_markup (GTK_LABEL (plugin->clock_label), str);
+
+	g_free (format);
 	g_free (str);
 
 	next_interval = 60 - g_date_time_get_second (datetime);
