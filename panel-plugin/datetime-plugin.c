@@ -229,31 +229,11 @@ clock_label_update (gpointer data)
 	return TRUE;
 }
 
-static gboolean
-datetime_plugin_clock_timeout_sync (gpointer data)
-{
-	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
-
-	if (G_LIKELY (plugin->timeout_id != 0))
-		g_source_remove (plugin->timeout_id);
-
-	plugin->timeout_id = 0;
-
-	clock_label_update (plugin);
-
-	/* start the real timeout default = 1M(60s) */
-	plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 60,
-											clock_label_update, plugin, NULL);
-
-	return FALSE;
-}
-
 static void
 datetime_plugin_add_clock (DateTimePlugin *plugin)
 {
 	gchar *str, *format;
 	GDateTime *datetime;
-	guint      next_interval;
 
 	plugin->clock_label = gtk_label_new (NULL);
 	gtk_label_set_justify (GTK_LABEL (plugin->clock_label), GTK_JUSTIFY_CENTER);
@@ -268,17 +248,9 @@ datetime_plugin_add_clock (DateTimePlugin *plugin)
 	g_free (format);
 	g_free (str);
 
-	next_interval = 60 - g_date_time_get_second (datetime);
-
-	if (next_interval > 0) {
-		plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, next_interval,
-													datetime_plugin_clock_timeout_sync,
-													plugin, NULL);
-	} else {
-		/* directly start running the normal timeout */
-		plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 60,
-												clock_label_update, plugin, NULL);
-	}
+	// update time label per 1s
+	plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 1,
+											clock_label_update, plugin, NULL);
 
 	g_date_time_unref (datetime);
 }
