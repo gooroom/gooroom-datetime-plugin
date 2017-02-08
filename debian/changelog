@@ -1,5 +1,12 @@
-gooroom-datetime-plugin (0.1) UNRELEASED; urgency=medium
+gooroom-datetime-plugin (0.1+grm1) unstable; urgency=medium
 
+  [ cjheo ]
   * Initial Release
+  * [a81387a9] Initial commit
+  * [f3951e2d] Add code for changing panel orientations and remove ClockTime object
+  * [3768381c] Change popup window UI and set text to bold in tray area
+  * [bdbc0228] Modify duration for refreshing time label
 
- -- cjheo <cjheo@gooroom.kr>  Mon, 24 Oct 2016 23:00:09 +0900
+  [ Gooroom Autobuilder ]
+
+ -- Gooroom Autobuilder <jenkins@gooroom.kr>  Wed, 08 Feb 2017 10:45:03 +0900
