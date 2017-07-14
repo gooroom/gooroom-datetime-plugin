@@ -123,7 +123,7 @@ on_popup_window_open (DateTimePlugin *plugin)
     gtk_builder_add_from_resource (plugin->builder, "/kr/gooroom/datetime/plugin/datetime-window.ui", NULL);
 	if (error) {
 		g_error_free (error);
-		return;
+		return NULL;
 	}
 
 	window = GET_WIDGET (plugin->builder, "datetime-window");
