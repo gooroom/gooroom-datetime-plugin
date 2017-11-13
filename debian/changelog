@@ -1,3 +1,14 @@
+gooroom-datetime-plugin (0.1.1+grm1u1) unstable; urgency=medium
+
+  [ cjheo ]
+  * [bb63a3f7] Changed icons and delete unnecessary files
+  * [14e7b4ff] Modify desktop file to prevent module from being added redundantly
+  * [a74fcbc7] Setting to use markup for plugin title.
+
+  [ Gooroom Autobuilder ]
+
+ -- Gooroom Autobuilder <jenkins@gooroom.kr>  Mon, 13 Nov 2017 20:24:36 +0900
+
 gooroom-datetime-plugin (0.1+grm1) unstable; urgency=medium
 
   [ cjheo ]
