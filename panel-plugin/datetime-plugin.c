@@ -28,18 +28,18 @@
 #endif
 
 #include "datetime-plugin.h"
-#include "datetime-window-resources.h"
 
 #include <gtk/gtk.h>
+#include <gdk/gdkkeysyms.h>
+
 #include <glib-object.h>
 #include <libxfce4ui/libxfce4ui.h>
 #include <libxfce4util/libxfce4util.h>
 #include <libxfce4panel/xfce-panel-plugin.h>
 
 
-#define DEFAULT_DIGITAL_FORMAT "%I: %M %P"
+#define DEFAULT_CLOCK_FORMAT "%P %I: %M"
 
-#define GET_WIDGET(builder, x) GTK_WIDGET (gtk_builder_get_object (builder, x))
 
 struct _DateTimePluginClass
 {
@@ -57,8 +57,6 @@ struct _DateTimePlugin
 	GtkWidget       *calendar;
 
 	guint            timeout_id;
-
-	GtkBuilder      *builder;
 };
 
 /* define the plugin */
@@ -83,7 +81,7 @@ on_popup_window_closed (gpointer data)
 static gboolean
 on_popup_key_press_event (GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
-	if (event->type == GDK_KEY_PRESS && event->keyval == GDK_KEY_Escape) {
+	if (event->type == GDK_KEY_PRESS && event->keyval == GDK_Escape) {
 		on_popup_window_closed (data);
 		return TRUE;
 	}
@@ -95,57 +93,81 @@ static void
 on_popup_window_realized (GtkWidget *widget, gpointer data)
 {
 	gint x, y;
-	GDateTime *datetime;
+	GDateTime *dt;
 
 	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
 
-	datetime = g_date_time_new_now_local ();
+	dt = g_date_time_new_now_local ();
 
 	gtk_calendar_select_month (GTK_CALENDAR (plugin->calendar),
-								g_date_time_get_month (datetime) - 1,
-								g_date_time_get_year (datetime));
+								g_date_time_get_month (dt) - 1,
+								g_date_time_get_year (dt));
 
-	gtk_calendar_select_day (GTK_CALENDAR (plugin->calendar), g_date_time_get_day_of_month (datetime));
+	gtk_calendar_select_day (GTK_CALENDAR (plugin->calendar), g_date_time_get_day_of_month (dt));
 
-	g_date_time_unref (datetime);
+	g_date_time_unref (dt);
 
 	xfce_panel_plugin_position_widget (XFCE_PANEL_PLUGIN (plugin), widget, plugin->button, &x, &y);
 	gtk_window_move (GTK_WINDOW (widget), x, y);
 }
 
 static GtkWidget *
-on_popup_window_open (DateTimePlugin *plugin)
+popup_datetime_window (DateTimePlugin *plugin)
 {
 	GError    *error = NULL;
-	GdkScreen *screen;
 	GtkWidget *window;
 
-    gtk_builder_add_from_resource (plugin->builder, "/kr/gooroom/datetime/plugin/datetime-window.ui", NULL);
-	if (error) {
-		g_error_free (error);
-		return NULL;
-	}
+    window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_type_hint (GTK_WINDOW (window), GDK_WINDOW_TYPE_HINT_UTILITY);
+    gtk_window_set_decorated (GTK_WINDOW (window), FALSE);
+    gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
+    gtk_window_set_skip_taskbar_hint (GTK_WINDOW (window), TRUE);
+    gtk_window_set_skip_pager_hint(GTK_WINDOW (window), TRUE);
+    gtk_window_set_keep_above (GTK_WINDOW (window), TRUE);
+    gtk_window_stick(GTK_WINDOW (window));
+    gtk_window_set_screen (GTK_WINDOW (window), gtk_widget_get_screen (GTK_WIDGET (plugin)));
 
-	window = GET_WIDGET (plugin->builder, "datetime-window");
-	gtk_window_set_type_hint (GTK_WINDOW (window), GDK_WINDOW_TYPE_HINT_UTILITY);
-	gtk_window_set_decorated (GTK_WINDOW (window), FALSE);
-	gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
-	gtk_window_set_skip_taskbar_hint (GTK_WINDOW (window), TRUE);
-	gtk_window_set_skip_pager_hint(GTK_WINDOW (window), TRUE);
-	gtk_window_set_keep_above (GTK_WINDOW (window), TRUE);
-	gtk_window_stick(GTK_WINDOW (window));
+	GtkWidget *main_vbox = gtk_vbox_new (FALSE, 0);
+	gtk_container_add (GTK_CONTAINER (window), main_vbox);
+	gtk_widget_show (main_vbox);
 
-	screen = gtk_widget_get_screen (GTK_WIDGET (plugin->button));
-	gtk_window_set_screen (GTK_WINDOW (window), screen);
+	GtkWidget *ebox = gtk_event_box_new ();
+	gtk_widget_set_name (ebox, "panel-popup-window-frame");
+	gtk_box_pack_start (GTK_BOX (main_vbox), ebox, FALSE, FALSE, 0);
+	gtk_widget_show (ebox);
 
-	plugin->calendar = GET_WIDGET (plugin->builder, "calendar");
+	GtkWidget *alignment = gtk_alignment_new (0.0, 0.5, 0.0, 0.0);
+	gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 5, 5, 5, 5);
+	gtk_container_add (GTK_CONTAINER (ebox), alignment);
+	gtk_widget_show (alignment);
+
+	GtkWidget *title = gtk_label_new (NULL);
+	gtk_label_set_markup (GTK_LABEL (title), _("<big><b>Date &amp; Time</b></big>"));
+	gtk_label_set_justify (GTK_LABEL (title), GTK_JUSTIFY_LEFT);
+	gtk_container_add (GTK_CONTAINER (alignment), title);
+	gtk_widget_show (title);
+
+	alignment = gtk_alignment_new (0.5, 0.5, 1.0, 1.0);
+	gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 10, 10, 10, 10);
+	gtk_box_pack_start (GTK_BOX (main_vbox), alignment, FALSE, FALSE, 0);
+	gtk_widget_show (alignment);
+
+	plugin->calendar = gtk_calendar_new ();
+	gtk_calendar_set_display_options (GTK_CALENDAR (plugin->calendar),
+                                      GTK_CALENDAR_SHOW_HEADING
+                                      | GTK_CALENDAR_SHOW_DAY_NAMES
+                                      | GTK_CALENDAR_SHOW_WEEK_NUMBERS);
+	gtk_container_add (GTK_CONTAINER (alignment), plugin->calendar);
+
+	gtk_widget_set_size_request (window, 256, -1);
+	gtk_widget_show (plugin->calendar);
 
 	g_signal_connect (G_OBJECT (window), "realize", G_CALLBACK (on_popup_window_realized), plugin);
 	g_signal_connect_swapped (G_OBJECT (window), "delete-event", G_CALLBACK (on_popup_window_closed), plugin);
 	g_signal_connect (G_OBJECT (window), "key-press-event", G_CALLBACK (on_popup_key_press_event), plugin);
 	g_signal_connect_swapped (G_OBJECT (window), "focus-out-event", G_CALLBACK (on_popup_window_closed), plugin);
 
-	gtk_widget_show (window);
+	gtk_widget_show_all (window);
 
 	xfce_panel_plugin_block_autohide (XFCE_PANEL_PLUGIN (plugin), TRUE);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (plugin->button), TRUE);
@@ -163,7 +185,7 @@ on_plugin_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer dat
 			if (plugin->popup_window != NULL) {
 				on_popup_window_closed (plugin);
 			} else {
-				plugin->popup_window = on_popup_window_open (plugin);
+				plugin->popup_window = popup_datetime_window (plugin);
 			}
 
 			return TRUE;
@@ -210,49 +232,24 @@ datetime_plugin_mode_changed (XfcePanelPlugin *plugin, XfcePanelPluginMode mode)
 
 
 static gboolean
-clock_label_update (gpointer data)
+date_clock_label_update (gpointer data)
 {
 	gchar *str, *format;
-	GDateTime *datetime;
+	GDateTime *dt;
 
 	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
 
-	datetime = g_date_time_new_now_local ();
-	format = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
-	str = g_strdup_printf ("<b>%s</b>", format);
+	/* update clock */
+	dt = g_date_time_new_now_local ();
+	format = g_date_time_format (dt, DEFAULT_CLOCK_FORMAT);
+	str = g_strdup_printf ("<b><big>%s</big></b>", format);
 	gtk_label_set_markup (GTK_LABEL (plugin->clock_label), str);
 	g_free (format);
 	g_free (str);
 
-	g_date_time_unref (datetime);
+	g_date_time_unref (dt);
 
 	return TRUE;
-}
-
-static void
-datetime_plugin_add_clock (DateTimePlugin *plugin)
-{
-	gchar *str, *format;
-	GDateTime *datetime;
-
-	plugin->clock_label = gtk_label_new (NULL);
-	gtk_label_set_justify (GTK_LABEL (plugin->clock_label), GTK_JUSTIFY_CENTER);
-	gtk_container_add (GTK_CONTAINER (plugin->button), plugin->clock_label);
-	gtk_widget_show (plugin->clock_label);
-
-	datetime = g_date_time_new_now_local ();
-	format = g_date_time_format (datetime, DEFAULT_DIGITAL_FORMAT);
-	str = g_strdup_printf ("<b>%s</b>", format);
-	gtk_label_set_markup (GTK_LABEL (plugin->clock_label), str);
-
-	g_free (format);
-	g_free (str);
-
-	// update time label per 1s
-	plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 1,
-											clock_label_update, plugin, NULL);
-
-	g_date_time_unref (datetime);
 }
 
 static void
@@ -265,22 +262,25 @@ datetime_plugin_free_data (XfcePanelPlugin *panel_plugin)
 
 	if (G_LIKELY (plugin->timeout_id != 0))
 		g_source_remove (plugin->timeout_id);
-
-	if (plugin->builder)
-		g_object_unref (G_OBJECT (plugin->builder));
 }
 
 static void
 datetime_plugin_init (DateTimePlugin *plugin)
 {
-	GError *error        = NULL;
-
 	plugin->button       = NULL;
 	plugin->clock_label  = NULL;
 
-	g_resources_register (datetime_window_get_resource ());
+	plugin->button = xfce_panel_create_toggle_button ();
+	gtk_widget_set_name (plugin->button, "gooroom-plugin-button");
+	xfce_panel_plugin_add_action_widget (XFCE_PANEL_PLUGIN (plugin), plugin->button);
+	gtk_container_add (GTK_CONTAINER (plugin), plugin->button);
 
-	plugin->builder = gtk_builder_new ();
+	plugin->clock_label = gtk_label_new (NULL);
+	gtk_label_set_justify (GTK_LABEL (plugin->clock_label), GTK_JUSTIFY_CENTER);
+	gtk_container_add (GTK_CONTAINER (plugin->button), plugin->clock_label);
+	gtk_widget_show_all (plugin->button);
+
+	g_signal_connect (G_OBJECT (plugin->button), "button-press-event", G_CALLBACK (on_plugin_button_pressed), plugin);
 }
 
 static void
@@ -292,34 +292,11 @@ datetime_plugin_construct (XfcePanelPlugin *panel_plugin)
 
 	xfce_textdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR, "UTF-8");
 
-	plugin->button = xfce_panel_create_toggle_button ();
-	gtk_widget_set_name (plugin->button, "datetime-plugin-button");
-	gtk_button_set_relief (GTK_BUTTON (plugin->button), GTK_RELIEF_NONE);
-	gtk_container_add (GTK_CONTAINER (plugin), plugin->button);
-	xfce_panel_plugin_add_action_widget (XFCE_PANEL_PLUGIN (plugin), plugin->button);
-	gtk_widget_show (plugin->button);
+	date_clock_label_update (plugin);
 
-#if 0
-	GtkCssProvider *css_provider;
-
-    /* Sane default Gtk style */
-	css_provider = gtk_css_provider_new ();
-	gtk_css_provider_load_from_data (css_provider,
-                                     "#datetime-plugin-button {"
-                                     "-GtkWidget-focus-padding: 0;"
-                                     "-GtkWidget-focus-line-width: 0;"
-                                     "-GtkButton-default-border: 0;"
-                                     "-GtkButton-inner-border: 0;"
-                                     "padding: 0 3px;"
-                                     "border-width: 1px;}",
-                                     -1, NULL);
-	gtk_style_context_add_provider (GTK_STYLE_CONTEXT (gtk_widget_get_style_context (GTK_WIDGET (plugin->button))),
-			GTK_STYLE_PROVIDER (css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-#endif
-
-	g_signal_connect (G_OBJECT (plugin->button), "button-press-event", G_CALLBACK (on_plugin_button_pressed), plugin);
-
-	datetime_plugin_add_clock (plugin);
+	// update time label per 1 sec
+	plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 1,
+                                                     date_clock_label_update, plugin, NULL);
 }
 
 static void

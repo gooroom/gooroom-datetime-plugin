@@ -8,21 +8,10 @@ plugindir = $(libdir)/xfce4/panel/plugins
 plugin_LTLIBRARIES = \
 	libdatetime-plugin.la
 
-BUILT_SOURCES = \
-	datetime-window-resources.c \
-	datetime-window-resources.h
-
 libdatetime_plugin_la_SOURCES = \
-	$(BUILT_SOURCES) \
 	datetime-plugin.h \
 	datetime-plugin.c \
 	$(NULL)
-
-resource_files = $(shell glib-compile-resources --sourcedir=$(srcdir) --generate-dependencies $(srcdir)/gresource.xml)
-datetime-window-resources.c: gresource.xml $(resource_files)
-	$(AM_V_GEN) glib-compile-resources --target=$@ --sourcedir=$(srcdir) --generate-source --c-name datetime_window $<
-datetime-window-resources.h: gresource.xml $(resource_files)
-	$(AM_V_GEN) glib-compile-resources --target=$@ --sourcedir=$(srcdir) --generate-header --c-name datetime_window $<
 
 libdatetime_plugin_la_CFLAGS = \
 	$(GLIB_CFLAGS) \
