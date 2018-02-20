@@ -137,7 +137,7 @@ popup_datetime_window (DateTimePlugin *plugin)
 	gtk_widget_show (ebox);
 
 	GtkWidget *alignment = gtk_alignment_new (0.0, 0.5, 0.0, 0.0);
-	gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 5, 5, 5, 5);
+	gtk_alignment_set_padding (GTK_ALIGNMENT (alignment), 7, 7, 7, 7);
 	gtk_container_add (GTK_CONTAINER (ebox), alignment);
 	gtk_widget_show (alignment);
 
@@ -252,6 +252,22 @@ date_clock_label_update (gpointer data)
 	return TRUE;
 }
 
+static gboolean
+update_ui (gpointer data)
+{
+	DateTimePlugin *plugin = DATETIME_PLUGIN (data);
+
+	date_clock_label_update (plugin);
+
+	// update time label per 1 sec
+	plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 1,
+                                                     date_clock_label_update, plugin, NULL);
+
+	g_signal_connect (G_OBJECT (plugin->button), "button-press-event", G_CALLBACK (on_plugin_button_pressed), plugin);
+
+	return FALSE;
+}
+
 static void
 datetime_plugin_free_data (XfcePanelPlugin *panel_plugin)
 {
@@ -270,8 +286,9 @@ datetime_plugin_init (DateTimePlugin *plugin)
 	plugin->button       = NULL;
 	plugin->clock_label  = NULL;
 
+	xfce_textdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR, "UTF-8");
+
 	plugin->button = xfce_panel_create_toggle_button ();
-	gtk_widget_set_name (plugin->button, "gooroom-plugin-button");
 	xfce_panel_plugin_add_action_widget (XFCE_PANEL_PLUGIN (plugin), plugin->button);
 	gtk_container_add (GTK_CONTAINER (plugin), plugin->button);
 
@@ -280,23 +297,7 @@ datetime_plugin_init (DateTimePlugin *plugin)
 	gtk_container_add (GTK_CONTAINER (plugin->button), plugin->clock_label);
 	gtk_widget_show_all (plugin->button);
 
-	g_signal_connect (G_OBJECT (plugin->button), "button-press-event", G_CALLBACK (on_plugin_button_pressed), plugin);
-}
-
-static void
-datetime_plugin_construct (XfcePanelPlugin *panel_plugin)
-{
-	GtkWidget *image;
-
-	DateTimePlugin *plugin = DATETIME_PLUGIN (panel_plugin);
-
-	xfce_textdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR, "UTF-8");
-
-	date_clock_label_update (plugin);
-
-	// update time label per 1 sec
-	plugin->timeout_id = g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 1,
-                                                     date_clock_label_update, plugin, NULL);
+	g_timeout_add (500, (GSourceFunc) update_ui, plugin);
 }
 
 static void
@@ -305,7 +306,6 @@ datetime_plugin_class_init (DateTimePluginClass *klass)
 	XfcePanelPluginClass *plugin_class;
 
 	plugin_class = XFCE_PANEL_PLUGIN_CLASS (klass);
-	plugin_class->construct = datetime_plugin_construct;
 	plugin_class->free_data = datetime_plugin_free_data;
 	plugin_class->size_changed = datetime_plugin_size_changed;
 	plugin_class->mode_changed = datetime_plugin_mode_changed;
