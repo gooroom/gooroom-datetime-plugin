@@ -112,7 +112,7 @@ on_popup_window_realized (GtkWidget *widget, gpointer data)
 }
 
 static GtkWidget *
-popup_datetime_window (DateTimePlugin *plugin)
+popup_window_new (DateTimePlugin *plugin)
 {
 	GError    *error = NULL;
 	GtkWidget *window;
@@ -185,7 +185,7 @@ on_plugin_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer dat
 			if (plugin->popup_window != NULL) {
 				on_popup_window_closed (plugin);
 			} else {
-				plugin->popup_window = popup_datetime_window (plugin);
+				plugin->popup_window = popup_window_new (plugin);
 			}
 
 			return TRUE;
@@ -273,8 +273,8 @@ datetime_plugin_free_data (XfcePanelPlugin *panel_plugin)
 {
 	DateTimePlugin *plugin = DATETIME_PLUGIN (panel_plugin);
 
-	if (plugin->popup_window)
-		gtk_widget_destroy (plugin->popup_window);
+	if (plugin->popup_window != NULL)
+		on_popup_window_closed (plugin);
 
 	if (G_LIKELY (plugin->timeout_id != 0))
 		g_source_remove (plugin->timeout_id);
