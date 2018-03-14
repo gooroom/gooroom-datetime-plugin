@@ -1,3 +1,14 @@
+gooroom-datetime-plugin (0.1.2+grm1u1) unstable; urgency=medium
+
+  [ cjheo ]
+  * [bc62b317] Using the gtk2 library instead of gtk3 as a stability issue in the xfce4 panel
+  * [237d322d] Changed the panel icon size
+  * [77218783] Updating code to maintain consistency with other plugins
+
+  [ Gooroom Autobuilder ]
+
+ -- Gooroom Autobuilder <jenkins@gooroom.kr>  Wed, 14 Mar 2018 18:33:09 +0900
+
 gooroom-datetime-plugin (0.1.1+grm1u1) unstable; urgency=medium
 
   [ cjheo ]
